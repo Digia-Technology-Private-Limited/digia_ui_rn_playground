@@ -1,22 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { DigiaUI, DUIFactory, DigiaUIManager, DUIAppState } from '@digia/rn-sdk';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { DigiaUI, DUIFactory, DigiaUIManager, DUIAppState, navigatorRef } from '@digia/rn-sdk';
 import { DigiaUIOptions, Flavors, Environment } from '@digia/rn-sdk';
 
-/**
- * Main application component with splash screen and countdown.
- * Manually initializes all Digia UI components in the correct order.
- */
+const Stack = createNativeStackNavigator();
+
 export default function App() {
   const [digiaUI, setDigiaUI] = useState<DigiaUI | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const [countdown, setCountdown] = useState(3);
+  const [countdown, setCountdown] = useState(2);
   const [showMainApp, setShowMainApp] = useState(false);
   const logoScale = new Animated.Value(0.5);
 
   useEffect(() => {
-    // Setup animation
     Animated.timing(logoScale, {
       toValue: 1.0,
       duration: 1500,
@@ -25,27 +23,19 @@ export default function App() {
       startCountdown();
     });
 
-    // Initialize DigiaUI
     initializeDigiaUI();
   }, []);
 
   const initializeDigiaUI = async () => {
     try {
       const initConfig: DigiaUIOptions = {
-        accessKey: '690c65ca4b393842139b6a86',
+        accessKey: '691616bd64a1246664d37b57',
         flavor: Flavors.debug({ environment: Environment.production }),
       };
 
-      // Step 1: Initialize DigiaUI
       const instance = await DigiaUI.initialize(initConfig);
-
-      // Step 2: Initialize DigiaUIManager
       DigiaUIManager.getInstance().initialize(instance);
-
-      // Step 3: Initialize global app state
       DUIAppState.instance.init(instance.dslConfig.appState ?? []);
-
-      // Step 4: Initialize DUIFactory
       DUIFactory.getInstance().initialize({
         pageConfigProvider: undefined,
         icons: undefined,
@@ -74,7 +64,6 @@ export default function App() {
     }, 1000);
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (isReady) {
@@ -85,34 +74,63 @@ export default function App() {
     };
   }, [isReady]);
 
-  if (showMainApp && isReady && digiaUI) {
-    // Now DUIFactory is fully initialized, safe to create pages
-    const initialPage = DUIFactory.getInstance().createInitialPage();
-
+  if (!showMainApp || !isReady || !digiaUI) {
     return (
-      <NavigationContainer>
-        {initialPage}
-      </NavigationContainer>
+      <View style={styles.splashContainer}>
+        <Animated.View style={[styles.logoContainer, { transform: [{ scale: logoScale }] }]}>
+          <View style={styles.logoCircle}>
+            <Text style={styles.logoText}>DIGIA</Text>
+          </View>
+        </Animated.View>
+        <Text style={styles.countdownText}>
+          Redirecting you to Digia in {countdown}
+        </Text>
+      </View>
     );
   }
 
+  // Like Flutter MaterialApp - just wrap and it works!
   return (
-    <View style={styles.splashContainer}>
-      <Animated.View
-        style={[
-          styles.logoContainer,
-          { transform: [{ scale: logoScale }] },
-        ]}
-      >
-        <View style={styles.logoCircle}>
-          <Text style={styles.logoText}>DIGIA</Text>
-        </View>
-      </Animated.View>
-      <Text style={styles.countdownText}>
-        Redirecting you to Digia in {countdown}
-      </Text>
-    </View>
+    <NavigationContainer ref={navigatorRef as any}>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Page" component={PageScreen} initialParams={{ pageId: 'initial' }} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
+}
+
+// Universal page component - renders any DUI page
+function PageScreen({ route }: any) {
+  // return DUIFactory.getInstance().createInitialPage();
+  const [page, setPage] = useState<any>(null);
+  const { pageId, params } = route.params || {};
+
+  // useEffect(() => {
+  //   console.log('📄 Rendering page:', pageId || 'initial');
+
+  //   try {
+  //     const duiPage = pageId === 'initial'
+  //       ? DUIFactory.getInstance().createInitialPage()
+  //       : DUIFactory.getInstance().createPage(pageId, params);
+
+  //     setPage(duiPage);
+  //     console.log('✅ Page rendered:', pageId || 'initial');
+  //   } catch (error) {
+  //     console.error('❌ Failed to create page:', error);
+  //   }
+  // }, [pageId]);
+
+  // if (!page) {
+  //   return (
+  //     <View style={styles.loadingContainer}>
+  //       <Text style={styles.loadingText}>Loading...</Text>
+  //     </View>
+  //   );
+  // }
+
+  return pageId === 'initial'
+    ? DUIFactory.getInstance().createInitialPage()
+    : DUIFactory.getInstance().createPage(pageId, params);;
 }
 
 const styles = StyleSheet.create({
@@ -147,5 +165,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666666',
   },
 });
