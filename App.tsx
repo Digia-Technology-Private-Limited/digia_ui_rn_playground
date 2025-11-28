@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { DigiaUI, DUIFactory, DigiaUIManager, DUIAppState, navigatorRef } from '@digia/rn-sdk';
+import { DigiaUI, DUIFactory, DigiaUIManager, DUIAppState, navigatorRef, } from '@digia/rn-sdk';
 import { DigiaUIOptions, Flavors, Environment } from '@digia/rn-sdk';
+
+declare const module: any;
 
 const Stack = createNativeStackNavigator();
 
@@ -12,9 +14,27 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [countdown, setCountdown] = useState(2);
   const [showMainApp, setShowMainApp] = useState(false);
+  const [appKey, setAppKey] = useState(0); // Add this missing state
   const logoScale = new Animated.Value(0.5);
 
   useEffect(() => {
+    if (__DEV__ && module.hot) {
+      module.hot.accept(() => {
+        console.log('🔥 Hot reload detected');
+        // Force state reset
+        setAppKey(prev => prev + 1);
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    // Reset everything when appKey changes (on hot reload)
+    setIsReady(false);
+    setDigiaUI(null);
+    setShowMainApp(false);
+    setCountdown(2);
+    logoScale.setValue(0.5);
+
     Animated.timing(logoScale, {
       toValue: 1.0,
       duration: 1500,
@@ -24,10 +44,15 @@ export default function App() {
     });
 
     initializeDigiaUI();
-  }, []);
+  }, [appKey]); // Add appKey as dependency
 
   const initializeDigiaUI = async () => {
     try {
+      // Clean up any existing instances first
+      DigiaUIManager.getInstance().destroy();
+      DUIAppState.instance.dispose();
+      DUIFactory.getInstance().destroy();
+
       const initConfig: DigiaUIOptions = {
         accessKey: '691616bd64a1246664d37b57',
         flavor: Flavors.debug({ environment: Environment.production }),
@@ -89,11 +114,15 @@ export default function App() {
     );
   }
 
-  // Like Flutter MaterialApp - just wrap and it works!
+  // Use appKey to force complete rebuild
   return (
-    <NavigationContainer ref={navigatorRef as any}>
+    <NavigationContainer key={`app_${appKey}`} ref={navigatorRef as any}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Page" component={PageScreen} initialParams={{ pageId: 'initial' }} />
+        <Stack.Screen
+          name="Page"
+          component={PageScreen}
+          initialParams={{ pageId: 'initial' }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -101,79 +130,40 @@ export default function App() {
 
 // Universal page component - renders any DUI page
 function PageScreen({ route }: any) {
-  // return DUIFactory.getInstance().createInitialPage();
-  const [page, setPage] = useState<any>(null);
   const { pageId, params } = route.params || {};
-
-  // useEffect(() => {
-  //   console.log('📄 Rendering page:', pageId || 'initial');
-
-  //   try {
-  //     const duiPage = pageId === 'initial'
-  //       ? DUIFactory.getInstance().createInitialPage()
-  //       : DUIFactory.getInstance().createPage(pageId, params);
-
-  //     setPage(duiPage);
-  //     console.log('✅ Page rendered:', pageId || 'initial');
-  //   } catch (error) {
-  //     console.error('❌ Failed to create page:', error);
-  //   }
-  // }, [pageId]);
-
-  // if (!page) {
-  //   return (
-  //     <View style={styles.loadingContainer}>
-  //       <Text style={styles.loadingText}>Loading...</Text>
-  //     </View>
-  //   );
-  // }
 
   return pageId === 'initial'
     ? DUIFactory.getInstance().createInitialPage()
-    : DUIFactory.getInstance().createPage(pageId, params);;
+    : DUIFactory.getInstance().createPage(pageId, params);
 }
 
 const styles = StyleSheet.create({
   splashContainer: {
     flex: 1,
-    backgroundColor: '#3F51B5',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#ffffff',
   },
   logoContainer: {
-    marginBottom: 40,
+    alignItems: 'center',
+    marginBottom: 30,
   },
   logoCircle: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: '#FFFFFF',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#6200ee',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10,
   },
   logoText: {
-    fontSize: 32,
+    color: 'white',
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#3F51B5',
   },
   countdownText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '500',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  loadingText: {
     fontSize: 16,
-    color: '#666666',
+    color: '#666',
+    marginTop: 20,
   },
 });
