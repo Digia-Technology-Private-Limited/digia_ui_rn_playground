@@ -1,137 +1,66 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { DigiaUI, DUIFactory, DigiaUIManager, DUIAppState, navigatorRef, } from '@digia/rn-sdk';
-import { DigiaUIOptions, Flavors, Environment } from '@digia/rn-sdk';
+import { DigiaUI, DUIFactory, DigiaUIManager, DUIAppState, navigatorRef, DigiaUIAppBuilder, } from 'digia-rn-sdk';
+import { DigiaUIOptions, Flavors, Environment } from 'digia-rn-sdk';
 
 declare const module: any;
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
-  const [digiaUI, setDigiaUI] = useState<DigiaUI | null>(null);
-  const [isReady, setIsReady] = useState(false);
-  const [countdown, setCountdown] = useState(2);
-  const [showMainApp, setShowMainApp] = useState(false);
-  const [appKey, setAppKey] = useState(0); // Add this missing state
-  const logoScale = new Animated.Value(0.5);
 
-  useEffect(() => {
-    if (__DEV__ && module.hot) {
-      module.hot.accept(() => {
-        console.log('🔥 Hot reload detected');
-        // Force state reset
-        setAppKey(prev => prev + 1);
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    // Reset everything when appKey changes (on hot reload)
-    setIsReady(false);
-    setDigiaUI(null);
-    setShowMainApp(false);
-    setCountdown(2);
-    logoScale.setValue(0.5);
-
-    Animated.timing(logoScale, {
-      toValue: 1.0,
-      duration: 1500,
-      useNativeDriver: true,
-    }).start(() => {
-      startCountdown();
-    });
-
-    initializeDigiaUI();
-  }, [appKey]); // Add appKey as dependency
-
-  const initializeDigiaUI = async () => {
-    try {
-      // Clean up any existing instances first
-      DigiaUIManager.getInstance().destroy();
-      DUIAppState.instance.dispose();
-      DUIFactory.getInstance().destroy();
-
-      const initConfig: DigiaUIOptions = {
-        accessKey: '691616bd64a1246664d37b57',
-        flavor: Flavors.debug({ environment: Environment.production }),
-      };
-
-      const instance = await DigiaUI.initialize(initConfig);
-      DigiaUIManager.getInstance().initialize(instance);
-      DUIAppState.instance.init(instance.dslConfig.appState ?? []);
-      DUIFactory.getInstance().initialize({
-        pageConfigProvider: undefined,
-        icons: undefined,
-        images: undefined,
-        fontFactory: null,
-      });
-
-      setDigiaUI(instance);
-      setIsReady(true);
-      console.log('✅ DigiaUI initialized successfully');
-    } catch (error) {
-      console.error('❌ Initialization failed:', error);
-    }
-  };
-
-  const startCountdown = () => {
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setShowMainApp(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (isReady) {
-        DigiaUIManager.getInstance().destroy();
-        DUIAppState.instance.dispose();
-        DUIFactory.getInstance().destroy();
-      }
-    };
-  }, [isReady]);
-
-  if (!showMainApp || !isReady || !digiaUI) {
-    return (
-      <View style={styles.splashContainer}>
-        <Animated.View style={[styles.logoContainer, { transform: [{ scale: logoScale }] }]}>
-          <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>DIGIA</Text>
-          </View>
-        </Animated.View>
-        <Text style={styles.countdownText}>
-          Redirecting you to Digia in {countdown}
-        </Text>
-      </View>
-    );
-  }
-
-  // Use appKey to force complete rebuild
   return (
-    <NavigationContainer key={`app_${appKey}`} ref={navigatorRef as any}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen
-          name="Page"
-          component={PageScreen}
-          initialParams={{ pageId: 'initial' }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <DigiaUIAppBuilder
+      options={{
+        accessKey: '691616bd64a1246664d37b57', // Your project access key
+        flavor: Flavors.debug(),
+      }}
+      children={(status) => {
+        // Make sure to access DUIFactory only when SDK is ready
+        if (status.isReady) {
+          return (
+            <NavigationContainer>
+              <Stack.Navigator screenOptions={{ headerShown: false }}>
+                <Stack.Screen
+                  name="Page"
+                  component={PageScreen}
+                  initialParams={{ pageId: 'initial' }}
+                />
+              </Stack.Navigator>
+            </NavigationContainer>
+          );
+        }
+
+        // Show loading indicator while initializing
+        if (status.isLoading) {
+          return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" />
+              <Text style={{ marginTop: 16 }}>Loading content...</Text>
+            </View>
+          );
+        }
+
+        // Show error UI if initialization fails
+        // In practice, this scenario should never occur, but it's a good habit to provide a user-friendly fallback just in case.
+        return (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ fontSize: 24 }}>⚠️</Text>
+            <Text style={{ marginTop: 16 }}>Failed to load content</Text>
+            <Text>Error: {status.error?.message}</Text>
+          </View>
+        );
+      }}
+    />
   );
 }
 
 // Universal page component - renders any DUI page
 function PageScreen({ route }: any) {
   const { pageId, params } = route.params || {};
-
+  console.log('Rendering page with ID:', pageId, 'and params:', params);
   return pageId === 'initial'
     ? DUIFactory.getInstance().createInitialPage()
     : DUIFactory.getInstance().createPage(pageId, params);
