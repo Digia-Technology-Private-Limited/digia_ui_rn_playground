@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { DigiaUI, DUIFactory, DigiaUIManager, DUIAppState, navigatorRef, DigiaUIAppBuilder, } from 'digia-rn-sdk';
-import { DigiaUIOptions, Flavors, Environment } from 'digia-rn-sdk';
+import { DigiaUI, DUIFactory, DigiaUIManager, DUIAppState, navigatorRef, DigiaUIAppBuilder, } from 'digia_sdk';
+import { DigiaUIOptions, Flavors, Environment } from 'digia_sdk';
 
 declare const module: any;
 
